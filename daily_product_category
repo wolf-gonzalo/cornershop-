@@ -1,0 +1,32 @@
+select 
+	date_trunc('day', op.updated at time zone sb.timezone) as "Day",
+	gc.country_id as country,
+	b.name as brand_name,
+	y.name as category,
+	p.name as product_name,
+	p.id as product_id,
+	p.barcodes,
+	p."SKU",
+	case when o.with_subscription='TRUE' then 'pop' else 'non pop' end as audiencie,
+	sum(op.quantity) as products_order, 
+	sum(op.quantity_found) as products_found, 
+	sum(op.quantity_found*op.branch_price) as sales, 
+	count(distinct o.id) as orders, 
+	count(distinct o.user_id) as users
+from orders_order o
+join orders_orderproduct op on op.order_id=o.id
+join catalog_product p on p.id=op.product_id
+left join catalog_brand b on b.id=p.brand_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+join catalog_store s on sb.store_id=s.id
+join geo_city gc on gc.id = sb.city_id 
+join catalog_productcategorization x on x.product_id=p.id
+join catalog_category y on y.id=x.category_id
+where y.id=988
+and gc.country_id = 'PE'
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+and o.actual_delivery_time > '2020-07-26'
+and o.actual_delivery_time at time zone sb.timezone >= '2020-07-26'
+and o.actual_delivery_time at time zone sb.timezone < '2020-08-03'
+group by 1,2,3,4,5,6,7,8,9
