@@ -1,0 +1,32 @@
+SELECT s.name,
+      promotional_project_id AS project_id,
+    pc.id AS campaign_id,
+    dc.model AS campaign_type,
+    CASE
+      WHEN pc.audience_id = 1 THEN 'Pop'
+      WHEN pc.audience_id = 2 THEN 'No Pop'
+      ELSE 'All'
+    END AS campaign_audience,
+    CASE o.with_subscription
+      WHEN TRUE THEN 'Pop'
+      ELSE 'No Pop'
+    END AS user_subs,
+    COUNT(DISTINCT o.id) AS orders,
+    SUM(oc.budget_used) AS budget_used
+FROM promotions_campaign pc
+JOIN promotions_campaignmetadata pcm ON pc.id = pcm.campaign_id
+join promotions_promotionalprojectcomponent ppc ON ppc.component_content_type_id IN (240,241,245,310,351,447,448,565,398) /*CAMPAÑAS*/
+AND ppc.component_id = pc.id
+JOIN django_content_type dc ON dc.id = ppc.component_content_type_id
+JOIN promotions_ordercampaign oc ON oc.campaign_id = pc.id
+JOIN orders_order o ON o.id = oc.order_id
+JOIN catalog_storebranch sb ON sb.id = o.store_branch_id
+join catalog_store s on s.id=sb.store_id
+JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+WHERE oc.budget_used > 0
+ AND o.status = 'DELIVERED'
+ AND sc.id = 32
+ AND o.order_kind = 'NORMAL'
+GROUP BY 1,2,3,4,5,6;
+ 
