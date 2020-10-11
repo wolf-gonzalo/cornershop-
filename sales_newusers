@@ -1,10 +1,5 @@
 Select
-    sb.store_id,
-    cs.name as store,
-    sc.name as collection,
-    TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','YYYY') AS ano,
     TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','MM') AS mes,
-    TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','IW') AS week,
     cs.is_longtail as longtail,
     sum(coalesce(o.total_receipt, o.shopper_total_receipt))::numeric as venta,
     count(DISTINCT o.external_id)::numeric as orders,
@@ -12,7 +7,8 @@ Select
     sum(o.qty_products_ordered) as prod_ordered,
     sum (o.qty_products_replaced) as prod_replaced,
     count(DISTINCT subconsulta.user_id)::numeric as new_users,     
-    count(DISTINCT o.user_id)::numeric as users
+    count(DISTINCT o.user_id)::numeric as users,
+    count(DISTINCT subconsulta.user_id)::numeric/count(DISTINCT o.user_id)::numeric  as percentage_nu
 from orders_order as o
 left join 
     (
@@ -33,6 +29,8 @@ JOIN catalog_storecollection as sc on sc.id = sci.collection_id
 WHERE o.currency = 'PEN'
     and o.status = 'DELIVERED'
     and o.order_kind = 'NORMAL'
-    and o.actual_delivery_time at time zone 'America/Lima' < '10-01-2020'
+    and cs.is_longtail = 'false'
+    and sb.store_id NOT in (841,853,872,1278,842)
+    and o.actual_delivery_time at time zone 'America/Lima' >= '08-01-2020'
     --AND sb.store_id not in (,)
-group by 1,2,3,4,5,6,7
+group by 1,2
