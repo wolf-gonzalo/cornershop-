@@ -1,0 +1,77 @@
+select 
+    i.country "Country",
+    cs.name,
+    cs.id store_id,
+    i.name as "Store Name",
+    count(i.order_id) as "Orders",
+    round((sum(i.total_products_wo_store_markup - i.receipt_after_taxes)*100::numeric / greatest(sum(i.receipt_after_taxes), 1))::numeric, 2) as "Catalog Diff %"
+    
+from (  
+    
+    select 
+        cs.country,
+        cs.id, 
+        cs.name,
+        csb.id as branch_id, 
+        csb.name as branch_name,
+        o.id as order_id,
+        o.delivery_charged,
+        csb.markup_pctg,
+        (o.total - o.delivery_charged - coalesce(och_m.price_charged, 0) + coalesce(discount, 0))/(1 + coalesce(csb.markup_pctg, 0)/100) as total_products_wo_store_markup, 
+        o.total, 
+        och_t.price_charged as taxes, 
+        och_m.price_charged as service_fee,
+        case 
+            when cs.country in ('CA', 'US') then sum(coalesce(cg.value::numeric, fv.value::numeric, ror.shopper_total, 0)) 
+            else coalesce(o.total_receipt, o.shopper_total_receipt)
+            end as receipt_after_taxes,
+        coalesce(discount, 0) as discount,
+        ((o.total - o.delivery_charged - coalesce(och_m.price_charged, 0) + coalesce(discount, 0))/(1 + coalesce(csb.markup_pctg, 0)/100) - sum(coalesce(ror.amount, fv.value::numeric, ror.shopper_total, 0)))*100::numeric / greatest(sum(coalesce(ror.amount, fv.value::numeric, ror.shopper_total, 0)), 1) as bad_markup,
+        o.actual_delivery_time at time zone csb.timezone as date,
+        cs.is_longtail, csb.timezone
+    from orders_order o 
+    left join orders_chargeableitem och_t on o.id = och_t.order_id and och_t.type = 'TAXES'
+    left join orders_chargeableitem och_m on o.id = och_m.order_id and och_m.type = 'MARKUP'
+    join catalog_storebranch csb on o.shopper_store_branch_id = csb.id 
+    join receipts_orderreceipt ror on o.id = ror.order_id and ror.valid
+    left join consolidator_goal cg on ror.id = cg.target_id and cg.target_content_type_id = 120 and cg.check_type_id = 40 and cg.consolidated
+    join catalog_store cs on csb.store_id = cs.id
+    left join common_eventoperation ceo on ceo.reference_content_type_id = 25 and ceo.reference_id = o.id and ceo.operation_type = 'ORDER_SET_AS_FREE_OF_CHARGE'
+    left join (
+                SELECT fv.receipt_id
+                    ,fv.value
+                FROM receipts_orderreceiptfieldvalue fv
+                JOIN receipts_storereceiptfielddefinition fd ON fv.field_definition_id = fd.id AND fd.name = 'total_after_taxes'
+            ) fv ON ror.id = fv.receipt_id
+    left join 
+        (
+        
+            SELECT coalesce(sum(discount), 0) AS discount, order_id
+            FROM promotions_ordercampaign oc
+            JOIN orders_order o ON o.id=order_id
+            JOIN catalog_storebranch csb on o.shopper_store_branch_id = csb.id
+            WHERE NOT EXISTS
+               (SELECT 1
+                FROM promotions_freedeliverycampaign fc
+                WHERE campaign_ptr_id = oc.campaign_id
+                  AND NOT o.with_subscription
+                UNION SELECT 1
+                FROM promotions_campaign pc
+                WHERE 
+                    is_store_promotion AND
+                    oc.campaign_id=pc.id) and 
+                    o.actual_delivery_time between '2020 10 14' and '2020 10 17'
+            GROUP BY order_id
+        
+        ) d on o.id = d.order_id    
+    
+    where o.actual_delivery_time between '2020 10 14' and '2020 10 17' 
+    and o.status = 'DELIVERED' and o.order_kind = 'NORMAL' 
+    and ceo.reference_id is null
+    group by 1, 2, 3, 4, 5, 6 ,7, 8, 9, 10, 11, 12, 14, 16, 17
+    ) i 
+join catalog_store cs on i.id = cs.id
+where i.date between '2020 10 15' and '2020 10 16'
+and cs.id = 870
+group by 1,2,3,4
+order by 1 desc
