@@ -1,8 +1,8 @@
 select 
+    TO_CHAR (i.date at time zone 'America/Lima','IW') AS week,
     i.country "Country",
     cs.name,
     cs.id store_id,
-    i.name as "Store Name",
     count(i.order_id) as "Orders",
     round((sum(i.total_products_wo_store_markup - i.receipt_after_taxes)*100::numeric / greatest(sum(i.receipt_after_taxes), 1))::numeric, 2) as "Catalog Diff %"
     
@@ -60,18 +60,18 @@ from (
                 WHERE 
                     is_store_promotion AND
                     oc.campaign_id=pc.id) and 
-                    o.actual_delivery_time between '2020 10 14' and '2020 10 17'
+                    o.actual_delivery_time between '2020 09 27' and '2020 10 13'
             GROUP BY order_id
         
         ) d on o.id = d.order_id    
     
-    where o.actual_delivery_time between '2020 10 14' and '2020 10 17' 
+    where o.actual_delivery_time between '2020 09 27' and '2020 10 13' 
     and o.status = 'DELIVERED' and o.order_kind = 'NORMAL' 
     and ceo.reference_id is null
     group by 1, 2, 3, 4, 5, 6 ,7, 8, 9, 10, 11, 12, 14, 16, 17
     ) i 
 join catalog_store cs on i.id = cs.id
-where i.date between '2020 10 15' and '2020 10 16'
-and cs.id = 870
+where i.date between '2020 09 28' and '2020 10 12'
+and cs.country = 'PE'
 group by 1,2,3,4
-order by 1 desc
+order by "Orders" desc
