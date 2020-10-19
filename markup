@@ -74,4 +74,4 @@ join catalog_store cs on i.id = cs.id
 where i.date between '2020 09 28' and '2020 10 12'
 and cs.country = 'PE'
 group by 1,2,3,4
-order by "Orders" desc
+order by "Catalog Diff %" desc
