@@ -5,7 +5,8 @@ select
     cp.name as product_name,
     cp.barcodes,
     cp.package,
-    cp."SKU",
+    cp."SKU" as sku_cs,
+    ps."SKU" as sku_tienda,
     cp._img_url,
     cb.name as brand,
     cp.buy_unit,
@@ -21,14 +22,16 @@ from catalog_store cs
 join catalog_storebranch csb on cs.id = csb.store_id 
 join catalog_productbranch cpb on csb.id = cpb.branch_id 
 join catalog_product cp on cpb.product_id = cp.id 
+join catalog_productstore ps on concat(ps.product_id,ps.store_id) = concat(cp.id,cs.id)
 join catalog_productcategorization cpc on cp.id = cpc.product_id
 join catalog_category cc on cpc.category_id = cc.id 
 left join catalog_category cc2 on cc.parent_id = cc2.id 
 left join catalog_brand cb on cp.brand_id = cb.id 
 
-    where cs.id = 872 --(store id)
+    where cs.id = 853
+    and cp.id = 912710 --(store id)
     and cp.is_active --(only active product)
     and cpb.active --(only active productbranches)
     and csb.active --(only active branches)
     
-group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
