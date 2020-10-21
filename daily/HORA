@@ -1,0 +1,25 @@
+Select 
+    sb.store_id,
+    cs.name as store,
+    date_trunc ('Hour',o.actual_delivery_time at time zone 'America/Lima') AS hora,
+    sum(coalesce(o.total_receipt, o.shopper_total_receipt))::numeric as venta, 
+    count(DISTINCT o.external_id)::numeric as orders
+
+from orders_order as o
+JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+LEFT JOIN (select order_id, sum(budget_used) as budget_used
+           from promotions_ordercampaign as poc 
+			where poc.budget_used > 0 
+		   group by 1) poc on poc.order_id = o.id
+WHERE cs.name in ('Metro','Wong')
+    AND o.currency = 'PEN' 
+    and o.status = 'DELIVERED'
+    and o.order_kind = 'NORMAL'
+    AND o.actual_delivery_time at time zone 'America/Lima' >= '08-10-2020'
+    and extract ('dow' from o.actual_delivery_time at time zone 'America/Lima') in (6,0)
+    --AND sb.store_id not in (,)
+group by 1,2,3
