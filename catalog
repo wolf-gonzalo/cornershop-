@@ -28,8 +28,7 @@ join catalog_category cc on cpc.category_id = cc.id
 left join catalog_category cc2 on cc.parent_id = cc2.id 
 left join catalog_brand cb on cp.brand_id = cb.id 
 
-    where cs.id = 853
-    and cp.id = 912710 --(store id)
+    where cp.id = 912710 --(store id)
     and cp.is_active --(only active product)
     and cpb.active --(only active productbranches)
     and csb.active --(only active branches)
