@@ -1,0 +1,45 @@
+Select
+    sb.store_id,
+    cs.name as store,
+    cc.name as product_category,
+    cs.is_longtail as longtail,
+    sum(coalesce(o.total_receipt, o.shopper_total_receipt))::numeric as venta,
+    count(DISTINCT o.external_id)::numeric as orders,
+    sum(o.qty_products_found) as prod_found,
+    sum(o.qty_products_ordered) as prod_ordered,
+    sum (o.qty_products_replaced) as prod_replaced,
+    sum (CASE o.with_subscription when true then 1
+        else 0 end) as Pop,
+    sum (o.shopper_total_receipt)::numeric as total_shopper,
+    sum (o.total)::numeric as total_cliente,
+    sum (o.delivery_charged)::numeric as delivery,
+    count(DISTINCT subconsulta.user_id)::numeric as new_users,     
+    count(DISTINCT o.user_id)::numeric as users
+from orders_order as o
+left join 
+    (
+    select *,true as is_new_user from 
+        (select  row_number() over(partition by user_id order by created) as no_pedido , 
+        id as order_id, 
+        user_id, 
+        created
+        FROM orders_order where currency='PEN'and status = 'DELIVERED' and order_kind = 'NORMAL') as pedido 
+        where pedido.no_pedido=1
+    ) as subconsulta
+on subconsulta.order_id=o.id
+JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+--JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+--JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+join orders_orderproduct op on o.id=op.order_id
+join catalog_product p on p.id=op.product_id 
+join catalog_productcategorization pc on p.id = pc.product_id
+join catalog_category cc on pc.category_id = cc.id
+WHERE o.currency = 'PEN'
+    and o.status = 'DELIVERED'
+    and o.order_kind = 'NORMAL'
+    and cs.is_longtail = 'true'
+    AND o.actual_delivery_time at time zone 'America/Lima' between '2020-09-01' and '2020-09-14'
+    --AND sb.store_id not in (,)
+group by 1,2,3,4
