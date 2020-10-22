@@ -1,0 +1,11 @@
+--usuarios de una tienda hasta fecha de quiebre
+select
+distinct u.id
+from crm_users_view u
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where s.id = 1225 and o.created at time zone 'America/Lima' < '2020-09-01' --Cambiar id de la tienda y fecha de quiebre
+and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+;
