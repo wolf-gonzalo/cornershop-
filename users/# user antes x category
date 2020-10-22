@@ -1,0 +1,22 @@
+--usuarios en categorias de la tienda antes del quiebre
+select
+cct.name,
+distinct(count(q.usuario))
+from(
+select
+distinct u.id as usuario
+from crm_users_view u
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where s.id = 1225 and o.created at time zone 'America/Lima' < '2020-09-01' --Cambiar id de la tienda y fecha de quiebre
+and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+)q
+join orders_order o on o.user_id = q.usuario
+join orders_orderproduct prod on o.id = prod.order_id
+join catalog_product cat on prod.product_id = cat.id
+join catalog_productcategorization ctg on cat.id = ctg.product_id
+join catalog_category cct on ctg.category_id = cct.id
+group by 1
+;
