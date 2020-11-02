@@ -1,32 +1,32 @@
-SELECT s.name,
-      promotional_project_id AS project_id,
-    pc.id AS campaign_id,
-    dc.model AS campaign_type,
-    CASE
-      WHEN pc.audience_id = 1 THEN 'Pop'
-      WHEN pc.audience_id = 2 THEN 'No Pop'
-      ELSE 'All'
-    END AS campaign_audience,
-    CASE o.with_subscription
-      WHEN TRUE THEN 'Pop'
-      ELSE 'No Pop'
-    END AS user_subs,
-    COUNT(DISTINCT o.id) AS orders,
-    SUM(oc.budget_used) AS budget_used
-FROM promotions_campaign pc
-JOIN promotions_campaignmetadata pcm ON pc.id = pcm.campaign_id
-join promotions_promotionalprojectcomponent ppc ON ppc.component_content_type_id IN (240,241,245,310,351,447,448,565,398) /*CAMPAÑAS*/
-AND ppc.component_id = pc.id
-JOIN django_content_type dc ON dc.id = ppc.component_content_type_id
-JOIN promotions_ordercampaign oc ON oc.campaign_id = pc.id
-JOIN orders_order o ON o.id = oc.order_id
-JOIN catalog_storebranch sb ON sb.id = o.store_branch_id
-join catalog_store s on s.id=sb.store_id
-JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
-JOIN catalog_storecollection as sc on sc.id = sci.collection_id
-WHERE oc.budget_used > 0
- AND o.status = 'DELIVERED'
- AND sc.id = 32
- AND o.order_kind = 'NORMAL'
-GROUP BY 1,2,3,4,5,6;
- 
+select
+TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','YYYY/MM/DD') AS dia,
+o.id as order_id,
+pp.id as project_id,
+case when c.cpg_id < 10000 then 'BRAND'
+when c.cpg_id = 10000 then 'CORNERSHOP'
+when c.cpg_id = 10001 then 'PARTNER'
+when c.cpg_id > 10001 then 'OTHER'
+else 'WITHOUT_TAG' end as sponsor,
+c.id as campaign_id,
+c.name as campaign_name,
+c.excerpt,
+case when c.audience_id=1 then 'Pop'
+     when c.audience_id=2 then 'No pop'
+     else 'all'
+end as audience,
+ sum(coalesce(o.total_receipt, o.shopper_total_receipt))::numeric as venta, 
+sum(oc.budget_used) as budget_used
+from promotions_campaign c
+join promotions_promotionalprojectcomponent ppc on ppc.component_id=c.id and ppc.component_content_type_id in (565,240, 241, 245, 310, 351, 397, 398, 447, 448)
+join promotions_promotionalproject pp on pp.id = ppc.promotional_project_id
+join promotions_ordercampaign oc on oc.campaign_id = c.id
+join orders_order o on o.id = oc.order_id
+join catalog_storebranch as sb on sb.id = o.store_branch_id
+join geo_city as gc on gc.id = sb.city_id
+join brandcenter_brandcentercpg cpg on cpg.id=c.cpg_id
+where c.country='PE'
+and ppc.promotional_project_id IN (11288)
+  AND o.actual_delivery_time at time zone 'America/Lima' >= '10-23-2020' 
+ AND o.actual_delivery_time at time zone 'America/Lima' < '11-03-2020'
+group by 1,2,3,4,5,6,7
+order by 1
