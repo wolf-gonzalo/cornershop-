@@ -4,8 +4,8 @@ null as mes,
 cs.name as store,
 pp.id as project_id,
 pp.name as project_name,
-c.valid_from at time zone gc.timezone as valid_from,
-c.valid_until at time zone gc.timezone as valid_until,
+to_char(c.valid_from at time zone gc.timezone, 'DD-MM-YYYY') as fecha_inicio,
+to_char(c.valid_until at time zone gc.timezone, 'DD-MM-YYYY') as fecha_fin,
 case when c.cpg_id < 10000 then 'BRAND'
 when c.cpg_id = 10000 then 'CORNERSHOP'
 when c.cpg_id = 10001 then 'PARTNER'
