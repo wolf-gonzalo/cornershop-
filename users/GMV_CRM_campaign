@@ -1,0 +1,13 @@
+select u.id, u.username, o.total, s.name
+from crm_users_view u
+join crm_audience_users au on u.id=au.user_id
+join crm_audience a on a.id=au.audience_id
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where au.audience_id = '5975'
+and (o.created AT TIME ZONE 'America/Lima') between '2020-11-06' and '2020-11-09'
+and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+and o.order_kind = 'NORMAL'	 and o.currency = 'PEN'
+and s.id not in (853,841,1278,872)
+;
