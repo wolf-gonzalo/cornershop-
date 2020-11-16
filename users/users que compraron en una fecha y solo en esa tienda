@@ -1,0 +1,22 @@
+select
+count(distinct u.id)
+from crm_users_view u
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where s.id in (872) and o.actual_delivery_time at time zone 'America/Lima' >= '2020-10-01' and o.actual_delivery_time at time zone 'America/Lima' < '2020-11-09' --Cambiar id de la tienda y fecha de quiebre
+and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+and u.id not in (
+    select
+    u.id
+    from crm_users_view u
+    join orders_order o on o.user_id=u.id
+    join catalog_storebranch sb on sb.id = o.store_branch_id
+    join catalog_store s on s.id = sb.store_id
+    where s.id in (853,841,1278,842) and o.actual_delivery_time at time zone 'America/Lima' >= '2020-10-01' and o.actual_delivery_time at time zone 'America/Lima' < '2020-11-09'--Cambiar id de la tienda y fecha de quiebre
+    and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+    and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+    group by 1
+    having  count(o.id)>1
+    )
