@@ -1,0 +1,47 @@
+SELECT 
+    e.name as store
+    ,d.name as branch
+    ,a.order_id
+    ,case when b.with_subscription='TRUE' then 'pop' else 'non pop' end as audiencie
+--count(distinct a.order_id) filter (where c.early)::numeric/count(distinct a.order_id) early,
+--count(distinct a.order_id) filter (where c.on_time)::numeric/count(distinct a.order_id) on_time,
+--count(distinct a.order_id) filter (where c.late)::numeric/count(distinct a.order_id) late,
+--count(distinct a.shopper_picking_id) shoppers,
+--count(distinct a.order_id) filter (where b.on_demand)::numeric/count(distinct a.order_id) on_demand,
+--count(distinct a.order_id) filter (where b.branch_id<>b.initial_branch_id)::numeric/count(distinct a.order_id) different_branch,
+    ,a.total as ticket
+    ,a.products_found+a.products_replaced as products
+    ,a.weight
+    ,a.bags
+    ,a.total_receipt
+    ,a.service_fee_charged
+    ,a.delivery_charged
+--sum(a.products_found)::numeric/sum(a.products_ordered) fr,
+--sum(a.products_found+a.products_replaced)::numeric/sum(a.products_ordered) ffr,
+    ,a.picker_to_branch+a.branch_to_customer as total_distance
+    ,a.picker_to_branch as picker_to_branch
+    ,a.branch_to_customer as branch_to_customer
+    ,a.partner_commission
+    ,sc.total_commission 
+
+--avg(extract(epoch from c.delivered_time)-extract(epoch from c.picking_accepted_time))::numeric/60 total_time,
+--avg(extract(epoch from c.picking_finished_time)-extract(epoch from c.picking_accepted_time))::numeric/60 picking_time,
+--avg(extract(epoch from c.delivered_time)-extract(epoch from c.delivery_ready_to_go_time))::numeric/60 delivery_time,
+--avg(extract(epoch from c.picking_accepted_time)-extract(epoch from c.picking_assignable_time))::numeric/60 assign_time,
+--avg(extract(epoch from c.picking_shopping_time)-extract(epoch from c.picking_accepted_time))::numeric/60 setup_time,
+--avg(extract(epoch from c.picking_checkout_time)-extract(epoch from c.picking_shopping_time))::numeric/60 shopping_time,
+--avg(extract(epoch from c.picking_checkout_time)-extract(epoch from c.picking_shopping_time))::numeric/60/avg(a.products_found+a.products_replaced) picking_speed,
+--avg(extract(epoch from c.picking_finished_time)-extract(epoch from c.picking_checkout_time))::numeric/60 checkout_time,
+--avg(extract(epoch from c.picking_finished_time)-extract(epoch from c.picking_checkout_time))::numeric/60/avg(a.products_found+a.products_replaced) checkout_speed
+
+from orders_ordersummary a
+
+left join orders_orderattributes b on b.order_id=a.order_id
+left join orders_ordertimes c on c.order_id=a.order_id
+left join catalog_storebranch d on d.id=b.branch_id
+left join catalog_store e on e.id=d.store_id
+left join orders_shopperscommission sc on sc.order_id=a.order_id
+where a.country='PE' and a.order_kind<>'GIFT_ORDER'
+--and e.name in('Wong')
+and date(a.actual_delivery_time at time zone 'America/Lima')>= '2020-09-01'
+and date(a.actual_delivery_time at time zone 'America/Lima')< '2020-11-19'
