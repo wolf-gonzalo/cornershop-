@@ -1,0 +1,37 @@
+Select 
+date_trunc('day', o.actual_delivery_time at time zone sb.timezone)::date as "Fecha",
+gc.name as "City",
+goz.name as "Zone",
+s.id as "Store id" ,
+s.name as "Store",
+sb.id as "Branch id",
+sb.name as "Branch",
+s.is_longtail as "Longtail",
+sc.name as "Category",
+s.status as "Store_Status",
+case when (s.is_longtail='FALSE' and sc.name='Supermercados') then 'Groceries'
+when (s.is_longtail='FALSE' and sc.name='Conveniencia') then 'Conveniencia'
+when (s.is_longtail='FALSE') then 'KA'
+when (s.is_longtail='TRUE') then 'Store'
+else 'NA'
+end as "BizDev",
+count(distinct o.external_id)::numeric as "# Orders",
+sum(o.qty_products_ordered) as "Units Requested",
+sum(o.qty_products_found) as "Units Found",
+(sum(o.qty_products_found)+sum (o.qty_products_replaced)) as "Units Delivered",
+sum(coalesce(o.total_receipt,o.shopper_total_receipt))::numeric as "Sales (local currency)"
+from orders_order as o 
+join catalog_storebranch as sb on o.shopper_store_branch_id=sb.id
+join catalog_store as s on sb.store_id=s.id
+join geo_city as gc on sb.city_id=gc.id
+join geo_opzone goz on ST_Intersects(goz.multi_poly, sb.picking_point) and not goz.deleted
+join catalog_storecollectionitem sci on sci.store_id=s.id
+join catalog_storecollection sc on sc.id=sci.collection_id
+where 
+gc.country_id='PE'
+and o.actual_delivery_time at time zone sb.timezone>=date_trunc('week',current_date)-interval '8 week'
+and o.actual_delivery_time at time zone sb.timezone< date_trunc('week',current_date)
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1 desc
