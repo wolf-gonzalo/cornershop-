@@ -1,0 +1,9 @@
+select cs.name as store, sb.name as branch, sg.query, count(sg.query)
+from search_searchlog sg
+join catalog_storebranch sb on sb.id = sg.branch_id 
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+where cs.country = 'PE' and sg.created > '2020 11 01'
+group by 1,2,3 
