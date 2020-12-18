@@ -1,0 +1,62 @@
+with products as (
+	        select
+	        s.name as store,
+	        csb.id as branch_id,
+	        csb.name as branch,
+	        cc.id as category_id,
+	        cc.name as category,
+	        op.order_id, 
+	        op.product_id, 
+	        cp.name as product_name, 
+	        cp.buy_unit,
+	        op.quantity,
+	        op.quantity_found,
+	        op.branch_price,
+	        op.shopper_price,
+	        gc.name as city
+	    from orders_order o 
+	    join orders_orderproduct op on o.id = op.order_id 
+	    join catalog_product cp on cp.id = op.product_id
+	    join catalog_storebranch csb on o.shopper_store_branch_id = csb.id and csb.store_id = 872--STORE ID
+	    join catalog_store s on s.id=csb.store_id
+	    join catalog_productcategorization cpc on cp.id = cpc.product_id
+	    join catalog_category cc on cpc.category_id = cc.id
+	    join geo_city gc on gc.id=csb.city_id
+	    where 
+	    	op.quantity_found > 0 
+	    	and o.actual_delivery_time >='2020-11-30'::date-interval '1 day' 
+	    	and o.actual_delivery_time < '2020-12-07'::date +interval '2 day'
+	    	and o.actual_delivery_time at time zone csb.timezone>= '2020-11-30'
+	    	and o.actual_delivery_time at time zone csb.timezone<'2020-12-07'
+	    	), 
+calculo_markups as(
+	    select 
+	    i.store,
+	    i.city,
+		i.branch_id,
+		i.branch,
+		i.category_id,
+		i.category,
+		i.product_id,
+		i.product_name,
+		i.buy_unit,
+		sum(i.quantity_found) as quantity_found,
+		sum(coalesce(i.quantity_found, 0) * branch_price) - sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)) as total_markup,
+		(sum(coalesce(i.quantity_found, 0) * branch_price) - sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price))) / sum(i.quantity_found) as markup_per_product,
+		min(i.branch_price) as min_branch_price,
+		avg(i.branch_price) as average_branch_price,
+		max(i.branch_price) as max_branch_price,
+		min(i.shopper_price) as min_shopper_price,
+		avg(i.shopper_price) as average_shopper_price,
+		max(i.shopper_price) as max_shopper_price,
+		sum(coalesce(i.quantity_found, 0) * coalesce(i.branch_price, i.shopper_price)) as branch_total,
+		sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)) as shopper_total,
+		(sum(coalesce(i.quantity_found, 0) * branch_price) - sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)))*100::float / (sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price))) as markup_pctg,
+		count(i.order_id) as times_ordered,
+		count(i.order_id) filter (where i.branch_price - i.shopper_price != 0) as times_with_markup
+	from products i  
+	group by 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    select * from calculo_markups
+    where times_with_markup>0
+    order by total_markup asc
+	
