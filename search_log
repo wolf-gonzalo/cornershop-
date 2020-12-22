@@ -1,9 +1,20 @@
-select TO_CHAR (sg.created at time zone 'America/Lima','IW') AS week,cs.name as store, sb.name as branch, sg.query, count(sg.query)
+with rank_filter as(
+select 
+TO_CHAR (sg.created at time zone 'America/Lima','IW') AS week,
+cs.id as store_id,
+cs.name as store,
+sg.query , 
+count(sg.query),
+RANK () OVER ( 
+		PARTITION BY cs.id, TO_CHAR (sg.created at time zone 'America/Lima','IW')
+		ORDER BY count(sg.query) DESC
+	) rank 
 from search_searchlog sg
 join catalog_storebranch sb on sb.id = sg.branch_id 
 JOIN geo_city gc on gc.id = sb.city_id
 JOIN catalog_store as cs on cs.id = sb.store_id
 JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
 JOIN catalog_storecollection as sc on sc.id = sci.collection_id
-where cs.country = 'PE' and sg.created > '2020 11 01'
-group by 1,2,3,4
+where cs.country = 'PE' and sg.created >= '2020 10 01' and sg.created < '2020 10 16' and cs.id in (1475)
+group by 1,2,3,4)
+select * from rank_filter where rank<=100 order by 1,2,5 desc
