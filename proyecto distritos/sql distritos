@@ -9,6 +9,7 @@ select oa.order_id,
        oa.locality,
        TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','YYYY/MM/DD') AS dia,
        cs.is_longtail as longtail
+       case when o.with_subscription='TRUE' then 'pop' else 'non pop' end as audiencie,
 from orders_orderaddress as oa
 join orders_order as o on o.id=oa.order_id 
 JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
