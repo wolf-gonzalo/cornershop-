@@ -1,5 +1,6 @@
 select oa.order_id,
        sb.store_id,
+       goz.name as zone,
        sb.name as branch,
        sc.name as collection,
        cs.name as store,
@@ -7,8 +8,7 @@ select oa.order_id,
        oa.lng, 
        oa.locality,
        TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','YYYY/MM/DD') AS dia,
-       cs.is_longtail as longtail,
-       sum (CASE o.with_subscription when true then 1 else 0 end) as Pop
+       cs.is_longtail as longtail
 from orders_orderaddress as oa
 join orders_order as o on o.id=oa.order_id 
 JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
@@ -16,8 +16,9 @@ JOIN geo_city gc on gc.id = sb.city_id
 JOIN catalog_store as cs on cs.id = sb.store_id
 JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
 JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+join geo_opzone goz on ST_Intersects(goz.multi_poly, sb.picking_point) and not goz.deleted
 
 where oa.country='PE'
 and o.actual_delivery_time between '2020-08-01' and '2020-09-15' 
 
-Group by 1,2,3,4,5,6,7,8,9,10
+Group by 1,2,3,4,5,6,7,8,9
