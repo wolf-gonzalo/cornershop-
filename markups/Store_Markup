@@ -1,0 +1,127 @@
+select 
+    date_trunc('day',i.date) as delivery_date,
+    i.country,
+    i.id store_id,
+    i.store,
+    sum(i.total) as total_charged,
+    sum(i.delivery_charged) delivery_charged,
+    sum(i.service_fee) as service_fee_charged,
+    sum(i.cpg_discount) cpg_discount,
+    avg(i.markup_pctg) store_markup_pctg,
+    sum(i.products_charged) products_charged,
+    --sum(i.taxes) taxes,
+    --sum(i.products_charged)-sum(taxes) as products_charged_without_taxes,
+    sum(i.receipt_after_taxes) as total_receipt,
+    round((sum(i.products_charged -i.receipt_after_taxes))::numeric, 2) as markup, 
+    round((sum(i.products_charged -i.receipt_after_taxes)*100::numeric / greatest(sum(i.receipt_after_taxes), 1))::numeric, 2) as markup_pctg,
+    sum(i.store_discount) store_discount,
+    sum(markup_cornershop_price) markup_cornershop_price,
+    sum(markup_branch_price) markup_branch_price
+from (  
+    select 
+        o.actual_delivery_time at time zone csb.timezone as date,     
+        cs.country,
+        cs.id, 
+        cs.name as store,
+        csb.id as branch_id, 
+        csb.name as branch_name,
+        o.id as order_id,
+        o.external_id,
+        o.user_id,
+        ror.image_url,
+        case when o.total_receipt is not null then true else false end consolidated_order,
+        case when o.shopper_store_branch_id = o.store_branch_id then true else false end same_branch,
+        o.delivery_charged,
+        csb.markup_pctg,
+        o.total, 
+        och_t.price_charged as taxes, 
+        och_m.price_charged as service_fee, 
+        coalesce(d.discount, 0) as cpg_discount, 
+        (o.total - o.delivery_charged - coalesce(och_m.price_charged, 0) + coalesce(d.discount, 0))/(1 + coalesce(csb.markup_pctg, 0)/100) as products_charged, 
+        coalesce(sd.discount,0) as store_discount,
+        coalesce(cat_info.markup_cornershop_price,0) as markup_cornershop_price,
+        coalesce(cat_info.markup_branch_price,0) as markup_branch_price,
+        case 
+            when cs.country in ('CA', 'US') then sum(coalesce(cg.value::numeric, fv.value::numeric, ror.shopper_total, 0)) 
+            else coalesce(o.total_receipt, o.shopper_total_receipt)
+        end as receipt_after_taxes
+    from orders_order o 
+    left join orders_chargeableitem och_t on o.id = och_t.order_id and och_t.type = 'TAXES'
+    left join orders_chargeableitem och_m on o.id = och_m.order_id and och_m.type = 'MARKUP'
+    join catalog_storebranch csb on o.shopper_store_branch_id = csb.id 
+    join receipts_orderreceipt ror on o.id = ror.order_id and ror.valid
+    left join consolidator_goal cg on ror.id = cg.target_id and cg.target_content_type_id = 120 and cg.check_type_id = 40 and cg.consolidated
+    join catalog_store cs on csb.store_id = cs.id
+    left join common_eventoperation ceo on ceo.reference_content_type_id = 25 and ceo.reference_id = o.id and ceo.operation_type = 'ORDER_SET_AS_FREE_OF_CHARGE'
+    left join
+            (
+            SELECT 
+            fv.receipt_id,
+            fv.value
+            FROM receipts_orderreceiptfieldvalue fv
+            JOIN receipts_storereceiptfielddefinition fd ON fv.field_definition_id = fd.id AND fd.name = 'total_after_taxes'
+            ) fv ON ror.id = fv.receipt_id
+    --CPG DISCOUNTS        
+    left join 
+            (
+            SELECT coalesce(sum(discount), 0) as discount, order_id
+            FROM promotions_ordercampaign oc
+            JOIN orders_order o ON o.id=order_id
+            JOIN catalog_storebranch csb on o.shopper_store_branch_id = csb.id
+            WHERE NOT EXISTS
+                   (SELECT 1
+                    FROM promotions_freedeliverycampaign fc
+                    WHERE campaign_ptr_id = oc.campaign_id
+                    AND NOT o.with_subscription
+                    UNION SELECT 1
+                    FROM promotions_campaign pc
+                    WHERE 
+                        pc.is_store_promotion AND oc.campaign_id=pc.id
+                    ) 
+            and o.actual_delivery_time between {{start_date}} - interval '1 day' and {{end_date}} + interval '1 day' 
+            and csb.store_id = {{store_id}} -- * FILTER store_id
+            GROUP BY order_id
+            ) d on o.id = d.order_id
+    -- STORE DISCOUNTS
+    left join 
+            (
+            SELECT coalesce(sum(discount), 0) AS discount, order_id
+            FROM promotions_ordercampaign oc
+            JOIN orders_order o ON o.id=order_id
+            JOIN catalog_storebranch csb on o.shopper_store_branch_id = csb.id
+            WHERE EXISTS
+               (SELECT 1
+                FROM promotions_campaign pc
+                WHERE 
+                    pc.is_store_promotion AND oc.campaign_id=pc.id
+                ) 
+            and o.actual_delivery_time between {{start_date}} - interval '1 day' and {{end_date}} + interval '1 day' 
+            and csb.store_id = {{store_id}}
+            GROUP BY order_id
+            ) sd on o.id = sd.order_id 
+    -- Catalog information markup
+    left join 
+            (
+            select op.order_id,
+            sum(op.quantity_found*(op.cornershop_price-op.shopper_price)) markup_cornershop_price,
+            sum(op.quantity_found*(op.branch_price-op.shopper_price)) markup_branch_price
+            from orders_order o 
+            join orders_orderproduct op on op.order_id = o.id
+            join catalog_storebranch csb on o.shopper_store_branch_id = csb.id and csb.store_id = {{store_id}}
+            where 1=1
+            and o.actual_delivery_time between {{start_date}} - interval '1 day' and {{end_date}} + interval '1 day'
+            and o.status = 'DELIVERED' 
+            and o.order_kind = 'NORMAL'
+            group by 1
+            ) cat_info on o.id = cat_info.order_id 
+    where 
+    o.actual_delivery_time between {{start_date}} - interval '1 day' and {{end_date}} + interval '1 day' 
+    and o.status = 'DELIVERED' 
+    and o.order_kind = 'NORMAL' 
+    and ceo.reference_id is null
+    and csb.store_id = {{store_id}} 
+    group by 1, 2, 3, 4, 5, 6 ,7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,20,21,22
+    ) i 
+where i.date between {{start_date}} and {{end_date}}+interval'1 day' 
+group by 1,2,3,4
+order by round((sum(i.products_charged - i.receipt_after_taxes))::numeric, 2) asc,1
