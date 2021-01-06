@@ -1,0 +1,24 @@
+select 
+	o.user_id,
+    s.id as store_id,
+	s.name as store,
+	c.name as category,
+	sum(op.quantity_found*op.branch_price) as sales, 
+	count(distinct o.id) as orders 
+from orders_orderproduct op
+join orders_order o on o.id=op.order_id 
+and o.user_id in 
+(284686,474151,590234) --COLOCAR USER_IDS
+join catalog_product p on p.id=op.product_id 
+join catalog_productcategorization pc on pc.product_id=p.id
+join catalog_category c on c.id=pc.category_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+join catalog_store s on sb.store_id=s.id and s.country='PE' and s.is_longtail='FALSE'
+where 1=1
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+and op.updated > '2020-10-09'::date-interval '1 day'
+and op.updated  at time zone sb.timezone >= '2020-10-09'
+and op.updated  at time zone sb.timezone < '2020-11-30' --RANGO DE FECHAS 
+group by 1,2,3,4
+order by 1,6 desc
