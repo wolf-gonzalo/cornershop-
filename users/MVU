@@ -1,0 +1,70 @@
+with universo_ordenes as (
+    select 
+    o.user_id,
+    o.id as order_id,
+    o.currency,
+    o.created,
+    row_number() over (partition by o.user_id order by o.created) as user_num_order
+    from orders_order o
+    where 1=1
+    and o.status='DELIVERED'
+    and o.order_kind='NORMAL'
+    order by 1
+    )
+,subconjunto_peru as (
+select 
+uo.order_id
+from universo_ordenes uo 
+where 
+uo.user_num_order=1
+and uo.currency='PEN'
+and uo.created>='2020-08-01'::date-interval '2 day'
+and uo.created<'2020-11-01'::date+interval '2 day'
+)
+,peru_usuarios_objetivo as(
+select  
+s.country,
+s.id as store_id,
+s.name as store,
+s.is_longtail,
+o.user_id,
+o.id as order_id,
+date_trunc('day', o.created at time zone sb.timezone) as creation_date,
+date_trunc('day', o.actual_delivery_time at time zone sb.timezone) as delivery_date,
+case o.with_subscription when true then 1 else 0 end as pop,
+coalesce(o.total_receipt,o.shopper_total_receipt)::numeric as sales        
+FROM subconjunto_peru sp
+JOIN orders_order o on o.id=sp.order_id
+JOIN catalog_storebranch sb on sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store s on s.id = sb.store_id
+where 1=1
+and o.created at time zone sb.timezone >='2020-08-01'
+and o.created at time zone sb.timezone <'2020-11-01'
+and s.is_longtail=true
+group by 1,2,3,4,5,6,7,8
+order by 7
+)
+select  
+s.country,
+o.user_id,
+puo.store as first_store,
+puo.is_longtail,
+puo.creation_date as first_order_creation_date,
+puo.delivery_date as first_order_delivery_date,
+extract(epoch from age('2020-11-19'::date,puo.creation_date))/86400 as days_from_first_order,
+count(distinct o.id) as total_orders,
+sum(coalesce(o.total_receipt,o.shopper_total_receipt))::numeric as total_sales,
+sum(coalesce(o.total_receipt,o.shopper_total_receipt))/count(distinct o.id) as avg_ticket
+FROM peru_usuarios_objetivo puo
+JOIN orders_order o on o.user_id=puo.user_id
+JOIN catalog_storebranch sb on sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store s on s.id = sb.store_id
+where 1=1
+and o.created at time zone sb.timezone >='2020-08-01'
+and o.created at time zone sb.timezone <'2020-11-19'
+and o.order_kind='NORMAL'
+and o.status='DELIVERED'
+group by 1,2,3,4,5,6,7
+order by 8 desc
