@@ -1,0 +1,60 @@
+with week40_users as(
+    select 
+    to_char(o.actual_delivery_time at time zone sb.timezone,'YYYY-IW') as week,
+    o.user_id,
+    s.id as store_id,
+    s.name as store,
+    count(distinct o.id) as orders
+    from orders_order o
+    join catalog_storebranch sb on sb.id=o.shopper_store_branch_id and o.currency='PEN'
+    join catalog_store s on s.id=sb.store_id and s.id in (5175)
+    --join catalog_storecollectionitem sci on sci.store_id=s.id
+    --join catalog_storecollection sc on sc.id=sci.collection_id and sc.id=13
+    join geo_city gc on gc.id=sb.city_id 
+    where 1=1
+    and o.status='DELIVERED'
+    and o.order_kind='NORMAL'
+    and to_char(o.actual_delivery_time at time zone sb.timezone,'IYYY-IW') IN ('2020-40') --usuarios de semana 40
+    group by 1,2,3,4
+)
+,favourite_store as (
+   select 
+    --to_char(o.actual_delivery_time at time zone sb.timezone,'YYYY-IW') as week,
+    o.user_id,
+    mode() within group (order by s.id) as favorite_store_id,
+    mode() within group (order by s.name) as favorite_store,
+    count(distinct o.id) as orders
+    from week40_users cs 
+    join orders_order o on o.user_id=cs.user_id
+    join catalog_storebranch sb on sb.id=o.shopper_store_branch_id and o.currency='PEN'
+    join catalog_store s on s.id=sb.store_id and s.country='PE'
+    join catalog_storecollectionitem sci on sci.store_id=s.id
+    join catalog_storecollection sc on sc.id=sci.collection_id 
+    join geo_city gc on gc.id=sb.city_id 
+    where 1=1
+    and o.status='DELIVERED'
+    and o.order_kind='NORMAL'
+    and to_char(o.actual_delivery_time at time zone sb.timezone,'IYYY-IW') between '2020-40' AND '2020-48' --rango para elegir la tienda favorita
+    group by 1
+)
+ select 
+    to_char(o.actual_delivery_time at time zone sb.timezone,'YYYY-IW') as week,
+    o.user_id,
+    fs.favorite_store_id,
+    fs.favorite_store,
+    s.id as store_id,
+    s.name as store,
+    count(distinct o.id) as orders
+    from favourite_store fs 
+    join orders_order o on o.user_id=fs.user_id
+    join catalog_storebranch sb on sb.id=o.shopper_store_branch_id and o.currency='PEN'
+    join catalog_store s on s.id=sb.store_id and s.country='PE'
+    join catalog_storecollectionitem sci on sci.store_id=s.id
+    join catalog_storecollection sc on sc.id=sci.collection_id 
+    join geo_city gc on gc.id=sb.city_id 
+    where 1=1
+    and o.status='DELIVERED'
+    and o.order_kind='NORMAL'
+    and to_char(o.actual_delivery_time at time zone sb.timezone,'IYYY-IW') between '2020-40' AND '2020-48' --rango a medir ordenes
+    group by 1,2,3,4,5,6
+    order by 2,1
