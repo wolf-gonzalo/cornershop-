@@ -1,0 +1,48 @@
+with products as (
+	        select
+	        s.name as store,
+	        csb.id as branch_id,
+	        csb.name as branch,
+	        cc.id as category_id,
+	        cc.name as category,
+	        op.order_id, 
+	        op.product_id, 
+	        cp.name as product_name, 
+	        cp.buy_unit,
+	        op.quantity,
+	        op.quantity_found,
+	        op.branch_price,
+	        op.shopper_price,
+	        gc.name as city
+	    from orders_order o 
+	    join orders_orderproduct op on o.id = op.order_id 
+	    join catalog_product cp on cp.id = op.product_id
+	    join catalog_storebranch csb on o.shopper_store_branch_id = csb.id and csb.store_id = {{store_id}}
+	    join catalog_store s on s.id=csb.store_id
+	    join catalog_productcategorization cpc on cp.id = cpc.product_id
+	    join catalog_category cc on cpc.category_id = cc.id
+	    join geo_city gc on gc.id=csb.city_id
+	    where 
+	    	op.quantity_found > 0 
+	    	and o.actual_delivery_time >={{desde}} -interval '1 day' 
+	    	and o.actual_delivery_time < {{hasta}} +interval '2 day'
+	    	and o.actual_delivery_time at time zone csb.timezone>= {{desde}} 
+	    	and o.actual_delivery_time at time zone csb.timezone<{{hasta}}+interval '1 day'  
+	    	), 
+calculo_markups as(
+	    select 
+	    i.store,
+		i.category_id,
+		i.category,
+		sum(i.quantity_found) as quantity_found,
+		sum(coalesce(i.quantity_found, 0) * branch_price) - sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)) as total_markup,
+		sum(coalesce(i.quantity_found, 0) * coalesce(i.branch_price, i.shopper_price)) as branch_total,
+		sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)) as shopper_total,
+		(sum(coalesce(i.quantity_found, 0) * branch_price) - sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price)))*100::float / (sum(coalesce(i.quantity_found, 0) * coalesce(i.shopper_price, i.branch_price))) as markup_pctg,
+		count(i.order_id) as times_ordered,
+		count(i.order_id) filter (where i.branch_price - i.shopper_price != 0) as times_with_markup
+	from products i  
+	group by 1, 2, 3)
+    select * from calculo_markups
+    where times_with_markup>0
+    order by total_markup asc
