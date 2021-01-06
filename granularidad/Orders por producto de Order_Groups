@@ -1,0 +1,37 @@
+with og as (
+ select 
+ og.id as order_group_id,
+ count(o.id) as count_orders,
+ string_agg(s.name,', ') as stores
+ from orders_ordergroup og
+ join orders_order o on o.order_group_id = og.id
+ join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+ join catalog_store s on s.id=sb.store_id and s.country='PE' and s.id in (841,6719,6718)
+ where o.actual_delivery_time at time zone 'America/Lima'>='2020-09-01'
+ and o.status='DELIVERED'
+ AND o.order_kind='NORMAL'
+ group by 1
+having count(o.id)>=2
+ order by 2 desc)
+ select 
+ o.user_id,
+ og.order_group_id,
+ og.stores,
+ s.id as store_id,
+ s.name as store,
+ o.id as order_id,
+ c.name as category_id,
+ p.id as product_id,
+ p.name as product_name,
+ sum(quantity) as quantity_requested,
+ sum(quantity_found) as quantity_found
+ from og
+ join orders_order o on og.order_group_id=o.order_group_id
+ join orders_orderproduct op on op.order_id=o.id
+ join catalog_product p on p.id=op.product_id
+ join catalog_productcategorization pc on pc.product_id=p.id
+ join catalog_category c on c.id=pc.category_id
+ join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+ join catalog_store s on s.id=sb.store_id and s.country='PE' and s.id in (841,6719,6718)
+ group by 1,2,3,4,5,6,7,8,9
+ order by 1,2
