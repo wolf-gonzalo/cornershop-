@@ -1,0 +1,19 @@
+--LOST_USERS
+    select 
+    s.id,
+    s.name as store,
+    o.user_id,
+    max(o.actual_delivery_time at time zone sb.timezone) as last_order,
+    extract(days from (current_date-max(date_trunc('day',o.actual_delivery_time at time zone sb.timezone)))) as days_since_last_order,
+    case when (current_date-max(o.actual_delivery_time at time zone sb.timezone))>'30 days'::interval then true else false end as lost_user,
+    count(distinct o.id) as total_orders
+    from orders_order o
+    join catalog_storebranch sb on sb.id=o.shopper_store_branch_id and o.currency='PEN'
+    join catalog_store s on s.id=sb.store_id and s.id in (5175)
+    join geo_city gc on gc.id=sb.city_id 
+    where 1=1
+    and o.status='DELIVERED'
+    and o.order_kind='NORMAL'
+    group by 1,2,3
+    having count(distinct o.id)>1
+    ORDER BY 5 DESC
