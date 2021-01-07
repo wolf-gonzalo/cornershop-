@@ -1,0 +1,42 @@
+--usuarios en las categorias que se fueron de la tienda
+select
+cs.name as store,
+cc2.name as parent_category,
+cct.name as category,
+count(distinct q.usuario)
+from(
+select
+distinct u.id as usuario
+from crm_users_view u
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where s.id in (7164) and o.created at time zone 'America/Lima' >= '2020-12-20' --Cambiar id de la tienda y fecha de quiebre
+and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+and u.id in (
+    select
+    u.id
+    from crm_users_view u
+    join orders_order o on o.user_id=u.id
+    join catalog_storebranch sb on sb.id = o.store_branch_id
+    join catalog_store s on s.id = sb.store_id
+    where o.created at time zone 'America/Lima' < '2020-12-20' --Cambiar id de la tienda y fecha de quiebre
+    and o.status not ilike 'canceled%' and o.status not ilike 'rejected%'
+    and o.order_kind = 'NORMAL'	and o.currency = 'PEN' and u.country = 'PE'
+    )
+)q
+join orders_order o on o.user_id = q.usuario
+join orders_orderproduct prod on o.id = prod.order_id
+join catalog_product cat on prod.product_id = cat.id
+join catalog_productcategorization ctg on cat.id = ctg.product_id
+join catalog_category cct on ctg.category_id = cct.id
+JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+left join catalog_category cc2 on cct.parent_id = cc2.id 
+where o.created at time zone 'America/Lima' < '2020-12-20'
+and cc2.name = 'Juguetes'
+group by 1,2,3
+order by 3 desc
+;
