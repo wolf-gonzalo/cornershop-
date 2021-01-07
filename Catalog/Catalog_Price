@@ -1,0 +1,21 @@
+select 
+    cs.id as store_id,
+    cs.name as store_name,
+    cp.id as product_id,
+    cp.name as product_name,
+    cpb.price as precio
+    
+from catalog_store cs 
+join catalog_storebranch csb on cs.id = csb.store_id 
+join catalog_productbranch cpb on csb.id = cpb.branch_id 
+join catalog_product cp on cpb.product_id = cp.id 
+join catalog_productstore ps on ps.product_id = cp.id and ps.store_id = cs.id
+join catalog_productcategorization cpc on cp.id = cpc.product_id
+join catalog_category cc on cpc.category_id = cc.id 
+left join catalog_category cc2 on cc.parent_id = cc2.id 
+left join catalog_brand cb on cp.brand_id = cb.id 
+
+    where cs.country = 'PE' --(store id)
+    and cs.name = 'Casaideas'
+    
+group by 1,2,3,4,5
