@@ -1,5 +1,5 @@
 select 
-	date_trunc('day', op.updated at time zone sb.timezone) as "Day",
+	 TO_CHAR (o.actual_delivery_time at time zone 'America/Lima','YYYY/MM/DD') AS dia,
 	gc.country_id as country,
 	b.name as brand_name,
 	y.name as category,
