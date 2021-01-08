@@ -1,0 +1,11 @@
+Select 
+    country,
+    TO_CHAR (date at time zone 'America/Lima','YYYY-MM-DD') AS fecha,
+    day_rate,
+    week_rate,
+    month_rate,
+    fixed_rate
+FROM currencyrate 
+Where date at time zone 'America/Lima' >= '12-15-2020'
+    and country = 'PE'
+Order by date
