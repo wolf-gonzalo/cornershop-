@@ -1,0 +1,28 @@
+SELECT "public"."catalog_productbranch"."active" AS "PB.active",
+"public"."catalog_productbranch"."availability_status" AS "PB.availability_status",
+"public"."catalog_productbranch"."branch_id" AS "branch_id",
+"public"."catalog_productbranch"."id" AS "id",
+"public"."catalog_productbranch"."product_id" AS "product_id",
+"catalog_storebranch"."name" AS "BRANCH_name",
+"catalog_storebranch"."active" AS "STORE_active",
+"catalog_product"."barcodes" AS "barcodes", 
+"catalog_product"."is_active" AS "PROD.is_active", 
+"catalog_product"."popularity" AS "popularity",
+"catalog_product"."name" AS "P.NAME",
+"catalog_category"."name" AS "CAT", "catalog_category_2"."name" AS "CAT_PARENT",
+"catalog_brand"."name" AS "BRAND",
+"catalog_storebranch"."store_id"
+FROM "public"."catalog_productbranch"
+JOIN "public"."catalog_storebranch" "catalog_storebranch" ON "public"."catalog_productbranch"."branch_id" = "catalog_storebranch"."id" 
+JOIN "public"."catalog_product" "catalog_product" ON "public"."catalog_productbranch"."product_id" = "catalog_product"."id" 
+JOIN "public"."catalog_productcategorization" "catalog_productcategorization" ON "public"."catalog_productbranch"."product_id" = "catalog_productcategorization"."product_id" 
+LEFT JOIN  "public"."catalog_category" "catalog_category" ON "catalog_productcategorization"."category_id" = "catalog_category"."id" 
+LEFT JOIN  "public"."catalog_category" "catalog_category_2" ON "catalog_category"."parent_id" = "catalog_category_2"."id" 
+LEFT JOIN "public"."catalog_brand" "catalog_brand" ON "catalog_product"."brand_id" = "catalog_brand"."id"
+WHERE "catalog_storebranch"."store_id" in (1278)
+--and catalog_productbranch.branch_id in (14516,14517)
+--and catalog_productbranch.product_id in (914955)
+ORDER BY "catalog_storebranch"."active" DESC, 
+"public"."catalog_productbranch"."branch_id" ASC, 
+"catalog_product"."popularity" DESC
+LIMIT 1048576
