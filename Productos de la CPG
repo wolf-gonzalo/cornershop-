@@ -1,0 +1,35 @@
+with
+country_cpg_products as(
+select 
+cpg.name as cpg,
+cpg.id as cpg_id,
+cpg.country_id,
+b.name as brand,
+p.id as product_id,
+p.name as product_name,
+p.package,
+p.currency
+from catalog_product p 
+join catalog_brand b on b.id=p.brand_id and p.currency={{currency}}
+join brandcenter_brandcentercpg_brands bcpg on bcpg.brand_id=b.id 
+join brandcenter_brandcentercpg cpg on cpg.id=bcpg.brandcentercpg_id and cpg.id in ({{cpg_id}}) 
+group by 1,2,3,4,5,6,7
+order by 1)
+select
+ccp.country_id,
+gc.name as city, 
+ccp.cpg,
+ccp.brand,
+s.name as store,
+ccp.product_id,
+ccp.product_name,
+ccp.package
+from country_cpg_products ccp
+join orders_orderproduct op on op.product_id=ccp.product_id
+join orders_order o on o.id=op.order_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+join catalog_store s on s.id=sb.store_id
+join geo_city gc on gc.id=sb.city_id
+where 1=1
+group by 1,2,3,4,5,6,7,8
+order by 5 desc
