@@ -1,0 +1,61 @@
+with orderproducts as(
+   select  o.id                                            AS  order_id
+          ,o.actual_delivery_time at time zone sb.timezone AS  order_delivered_at
+          ,o.actual_delivery_time                          AS  order_delivered_at_utc
+          ,op.updated at time zone sb.timezone             AS  product_picking_at
+	        ,op.id                                           AS  orderproduct_id
+	        ,op.product_id                                   AS  product_id
+	        ,cp.name as product_name
+	        ,o.shopper_store_branch_id                       AS  branch_id
+	        ,oc.campaign_id                                  AS  campaign_id    
+	        ,op.quantity_found                               AS  found
+	        ,op.quantity                                     AS  requested
+	        ,op.replaced                                     AS  replaced
+	        ,op.shopper_price                                AS  shopper_price
+	        ,op.tag_price                                    AS  tag_price
+	        ,op.branch_price                                 AS  branch_price
+	        ,op.cornershop_price                             AS  cornershop_price
+	        ,oc.discount::float                              AS  order_budget_used
+	        ,op.quantity_found * op.tag_price::float         AS  customer_sales
+          ,sum(op.tag_price::float*op.quantity_found::float) 
+            over (partition by oc.campaign_id, o.id)       AS  total_campaign_sales
+        FROM promotions_campaign c 
+        JOIN promotions_ordercampaign oc ON oc.campaign_id = c.id and oc.discount::float > 0
+        JOIN orders_order o ON o.id = oc.order_id 
+        JOIN catalog_storebranch sb ON sb.id = o.shopper_store_branch_id 
+        JOIN orders_orderproduct op ON op.order_id = o.id
+        JOIN catalog_productbranch pb ON pb.product_id = op.product_id AND
+            (
+                (op.created_by = 'CUSTOMER' AND pb.branch_id = o.store_branch_id) or
+                (op.created_by = 'SHOPPER' AND pb.branch_id = o.shopper_store_branch_id)
+            )   
+        JOIN promotions_productbranchpromotion pbp ON pbp.product_branch_id = pb.id 
+            AND pbp.campaign_id=oc.campaign_id
+        join catalog_product cp on pb.product_id = cp.id 
+        where o.status = 'DELIVERED'
+        and o.order_kind = 'NORMAL'
+        and oc.campaign_id = 27167
+        --and oc.order_id = 24266985 
+        --and o.actual_delivery_time  >= (select start_date from dates)
+        --and o.actual_delivery_time  < (select end_date from dates)  
+)
+select order_id
+      ,order_delivered_at_utc
+      ,order_delivered_at
+      ,product_picking_at
+	    ,orderproduct_id
+	    ,product_id
+	    ,product_name
+	    ,branch_id
+	    ,campaign_id    
+	    ,found
+	    ,requested
+	    ,replaced
+	    ,shopper_price
+	    ,tag_price
+	    ,branch_price
+	    ,cornershop_price
+	    ,order_budget_used
+	    ,total_campaign_sales
+      ,round((customer_sales/GREATEST(total_campaign_sales, 1) * order_budget_used)::numeric, 2) AS  product_budget_used
+from orderproducts;
