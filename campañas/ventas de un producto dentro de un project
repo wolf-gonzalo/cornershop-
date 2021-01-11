@@ -1,0 +1,28 @@
+select  
+s.name as store,
+gc.name as city,
+pp.id as project_id,
+p.id as product_id,
+p.name as product_name,
+o.external_id as external_id,
+op.quantity_found as found,
+op.quantity as requested,
+(op.quantity_found/op.quantity)::numeric  as foundrate,
+coalesce(op.quantity_found*op.branch_price,0)::numeric as sales,
+oc.discount::float as  order_budget_used
+    from promotions_campaign c 
+        join promotions_promotionalprojectcomponent ppc on ppc.component_id=c.id and ppc.component_content_type_id in (565,240, 241, 245, 310, 351, 397, 398, 447, 448)
+        join promotions_promotionalproject pp on pp.id = ppc.promotional_project_id and pp.id={{project_id}}
+        join promotions_ordercampaign oc ON oc.campaign_id = c.id and oc.discount::float > 0
+        join orders_order o ON o.id = oc.order_id 
+        join catalog_storebranch sb ON sb.id = o.shopper_store_branch_id 
+        join orders_orderproduct op ON op.order_id = o.id
+        join catalog_productbranch pb ON pb.product_id = op.product_id
+        join promotions_productbranchpromotion pbp ON pbp.product_branch_id = pb.id 
+            and pbp.campaign_id=oc.campaign_id
+        join catalog_product p on p.id=pb.product_id and p.currency='PEN'
+        join catalog_store s on s.id=sb.store_id
+        join geo_city gc on gc.id=sb.city_id
+    where o.status = 'DELIVERED'
+        and o.order_kind = 'NORMAL'
+    group by 1,2,3,4,5,6,7,8,9,10,11
