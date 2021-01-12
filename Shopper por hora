@@ -1,0 +1,42 @@
+WITH intervalos as (
+select s::time inicio, s::time + interval '10 minutes' fin
+from generate_series ('2020-09-07 08:00'::timestamp, '2020-09-11 22:00'::timestamp, '10 minutes') s)
+SELECT   city, 
+        zone_name, 
+        branch_id,
+        branch_name,
+        date,
+        i.inicio,
+        i.fin,
+        count (distinct t.shopper_picking_id) shoppers
+                FROM 
+                (SELECT geo_city.code city, 
+                        geo_opzone.name zone_name,
+                        catalog_storebranch.id as branch_id,
+                        catalog_storebranch.name as branch_name,
+                        o.id AS order_id,
+                        o.shopper_picking_id,
+                to_char(ooa1.created AT TIME ZONE geo_city.timezone,'IYYY_IW') week,
+                EXTRACT (ISODOW  from (ooa1.created AT TIME ZONE geo_city.timezone))  dow,
+                (ooa1.created AT TIME ZONE geo_city.timezone)::date as date,
+                MAX(ooa1.updated AT TIME ZONE geo_city.timezone) AS staarts,
+                MAX(COALESCE(ooa2.created, NOW()) AT TIME ZONE geo_city.timezone) AS ennds,
+                MAX(ooa1.created AT TIME ZONE geo_city.timezone)::time AS start_time,
+                (MAX(COALESCE(ooa2.created, NOW()) AT TIME ZONE geo_city.timezone))::time AS end_time
+                        FROM orders_order AS o
+                        JOIN catalog_storebranch ON o.shopper_store_branch_id = catalog_storebranch.id
+                        JOIN catalog_store ON catalog_storebranch.store_id = catalog_store.id 
+            JOIN geo_opzone ON ST_Intersects(geo_opzone.multi_poly, ST_SetSRID(ST_MakePoint(catalog_storebranch.lng, catalog_storebranch.lat), 4326)) and not geo_opzone.deleted 
+                        JOIN geo_city ON geo_city.id = catalog_storebranch.city_id   
+                        join orders_orderactivity as ooa1 on ooa1.order_id = o.id and ooa1.status = 'PICKING_SHOPPING'
+                        join orders_orderactivity as ooa2 on ooa2.order_id = o.id and ooa2.status = 'PICKING_FINISHED'
+                                WHERE
+                                o.status='DELIVERED' 
+                                and o.actual_delivery_time> current_date - interval '7 days'
+                                --and o.actual_delivery_time at time zone geo_city.timezone< '2020-08-06'
+                                and o.order_kind != 'GIFT_ORDER'
+                                and catalog_store.id=841
+                                GROUP BY 1,2,3,4,5,6,7,8,9         
+                 ) as t
+                join intervalos i on i.inicio< t.end_time and t.start_time<i.fin
+        GROUP BY 1,2,3,4,5,6,7
