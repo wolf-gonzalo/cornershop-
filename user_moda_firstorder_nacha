@@ -1,0 +1,38 @@
+with first_supers AS
+(
+select 
+o.user_id,
+row_number() over(partition by o.user_id order by o.created) rank,
+st.name as store
+FROM orders_order as o
+JOIN catalog_storebranch as sb on sb.id=o.shopper_store_branch_id
+JOIN catalog_store as st on st.id=sb.store_id 
+WHERE o.currency='PEN' and o.status='DELIVERED' 
+),
+favorita as (
+SELECT 
+o.user_id,
+mode() WITHIN GROUP (ORDER BY s.name) as tienda_favorita
+FROM orders_order as o
+JOIN catalog_storebranch as sb on sb.id=o.shopper_store_branch_id
+JOIN catalog_store as s on s.id=sb.store_id 
+WHERE o.currency='PEN' and o.status='DELIVERED'
+group by 1
+)
+SELECT 
+o.user_id, 
+u.date_first_order,
+count(o.id) filter (where o.created<=(u.date_first_order+interval'30 days')) orders_first_30days,
+count(o.id) total_orders_in_cornershop,
+m.tienda_favorita,
+fs.store first_store,
+fs2.store second_store, 
+Extract(days from current_date-u.date_last_order) as days_last_order
+FROM orders_order as o
+join favorita as m on m.user_id=o.user_id
+join first_supers as fs on fs.user_id=o.user_id and fs.rank=1
+left join first_supers as fs2 on fs2.user_id=o.user_id and fs2.rank=2
+join crm_users_view as u on u.id=o.user_id
+WHERE o.currency='PEN' and o.status='DELIVERED' and u.date_first_order 
+group by 1,2,5,6,7
+order by 3 DESC
