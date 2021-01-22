@@ -1,0 +1,42 @@
+select
+s.name as store,
+count(distinct u.id) as users,
+count(distinct u.id) filter (where extract (day from '2021-01-01'::date-u.date_last_order )>=90) as user_count_90,
+count(distinct u.id) filter (where extract (day from '2021-01-01'::date-u.date_last_order )>=60 and extract (day from '2021-01-01'::date-u.date_last_order )<90) as user_count_60,
+count(distinct u.id) filter (where extract (day from '2021-01-01'::date-u.date_last_order )>=30 and extract (day from '2021-01-01'::date-u.date_last_order )<60) as user_count_30,
+count(distinct u.id) filter (where extract (day from '2021-01-01'::date-u.date_last_order )<30) as active_users
+from(
+--USUARIOS QUE COMPRARON EN VIVANDA EN EL 2020
+select
+distinct u.id as usuario
+from crm_users_view u
+join orders_order o on o.user_id=u.id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id and s.id=872
+where 1=1
+and o.actual_delivery_time at time zone 'America/Lima' >= '2020-01-01' 
+and o.actual_delivery_time at time zone 'America/Lima' <'2021-01-01' 
+and o.status = 'DELIVERED' and o.order_kind = 'NORMAL' and o.currency = 'PEN' and u.country = 'PE'
+and u.id not in (--PERO NO COMPRARON EN VIVANDA EN 2021 
+    select
+    u.id
+    from crm_users_view u
+    join orders_order o on o.user_id=u.id
+    join catalog_storebranch sb on sb.id = o.store_branch_id
+    join catalog_store s on s.id = sb.store_id
+    where s.id = 872 and o.created at time zone 'America/Lima' >= '2021-01-01'
+    and o.status='DELIVERED'
+    and o.order_kind = 'NORMAL' and o.currency = 'PEN' and u.country = 'PE'
+    )
+)q
+--Y QUE COMPRARON EN WONG, METRO, MAKRO EN 2021
+join orders_order o on o.user_id = q.usuario
+join crm_users_view u on u.id=o.user_id
+join catalog_storebranch sb on sb.id = o.store_branch_id
+join catalog_store s on s.id = sb.store_id
+where s.country = 'PE' and o.currency = 'PEN'
+and o.actual_delivery_time at time zone 'America/Lima' >= '2021-01-01' 
+and o.status = 'DELIVERED'
+and o.order_kind = 'NORMAL'
+and s.name in ('Wong','Metro','Makro') 
+group by 1
