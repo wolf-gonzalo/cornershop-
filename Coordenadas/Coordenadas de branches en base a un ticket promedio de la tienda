@@ -1,0 +1,32 @@
+WITH tiendas_menores_100 as ( 
+Select 
+    sb.store_id,
+    cs.name as store,
+    sum (coalesce (o.total_receipt,o.shopper_total_receipt) ) /count (o.id) as avg_ticket 
+from orders_order as o
+JOIN catalog_storebranch as sb ON sb.id = o.shopper_store_branch_id
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+WHERE o.currency = 'PEN' 
+    and cs.is_longtail = 'true'
+    and o.status = 'DELIVERED'
+    and o.order_kind = 'NORMAL'
+    AND o.actual_delivery_time at time zone 'America/Lima' >= '11-01-2020' 
+    --AND sb.store_id not in (,)
+group by 1,2
+having sum (coalesce (o.total_receipt,o.shopper_total_receipt) ) /count (o.id)<=100
+)
+Select 
+    sb.store_id,
+    cs.name as store,
+    sb.name as branch,
+    sb.lat as lat,
+    sb.lng as lng
+from catalog_storebranch as sb
+JOIN geo_city gc on gc.id = sb.city_id
+JOIN catalog_store as cs on cs.id = sb.store_id
+JOIN catalog_storecollectionitem as sci on sci.store_id = sb.store_id
+JOIN catalog_storecollection as sc on sc.id = sci.collection_id
+join tiendas_menores_100 tm on tm.store_id = cs.id
