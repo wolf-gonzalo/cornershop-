@@ -1,0 +1,48 @@
+with base as ( 
+select 
+date_part('hour', o.created at time zone sb.timezone) as creation_hour,
+s.name as store,
+sb.name as branch,
+case when o.on_demand then 'on_demand' else 'scheduled' end as on_demand,
+count(o.id) as orders
+from orders_order as o 
+join catalog_storebranch as sb on o.shopper_store_branch_id=sb.id
+join catalog_store as s on sb.store_id=s.id and s.id=1278
+where 1=1
+and o.actual_delivery_time at time zone sb.timezone>=current_date-interval '1 day'
+and o.actual_delivery_time at time zone sb.timezone<current_date
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+group by 1,2,3,4)
+select 
+store,
+branch,
+on_demand,
+coalesce(sum(orders) filter (where creation_hour=0),0) as "12am",
+coalesce(sum(orders) filter (where creation_hour=1),0) as "01am",
+coalesce(sum(orders) filter (where creation_hour=2),0) as "02am",
+coalesce(sum(orders) filter (where creation_hour=3),0) as "03am",
+coalesce(sum(orders) filter (where creation_hour=4),0) as "04am",
+coalesce(sum(orders) filter (where creation_hour=5),0) as "05am",
+coalesce(sum(orders) filter (where creation_hour=6),0) as "06am",
+coalesce(sum(orders) filter (where creation_hour=7),0) as "07am",
+coalesce(sum(orders) filter (where creation_hour=8),0) as "08am",
+coalesce(sum(orders) filter (where creation_hour=9),0) as "09am",
+coalesce(sum(orders) filter (where creation_hour=10),0) as "10am",
+coalesce(sum(orders) filter (where creation_hour=11),0) as "11am",
+coalesce(sum(orders) filter (where creation_hour=12),0) as "12pm",
+coalesce(sum(orders) filter (where creation_hour=13),0) as "13pm",
+coalesce(sum(orders) filter (where creation_hour=14),0) as "14pm",
+coalesce(sum(orders) filter (where creation_hour=15),0) as "15pm",
+coalesce(sum(orders) filter (where creation_hour=16),0) as "16pm",
+coalesce(sum(orders) filter (where creation_hour=17),0) as "17pm",
+coalesce(sum(orders) filter (where creation_hour=19),0) as "18pm",
+coalesce(sum(orders) filter (where creation_hour=19),0) as "19pm",
+coalesce(sum(orders) filter (where creation_hour=20),0) as "20pm",
+coalesce(sum(orders) filter (where creation_hour=21),0) as "21pm",
+coalesce(sum(orders) filter (where creation_hour=22),0) as "22pm",
+coalesce(sum(orders) filter (where creation_hour=23),0) as "23pm",
+coalesce(sum(orders),0) as total
+from base
+group by 1,2,3
+order by 1,2,3
