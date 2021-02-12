@@ -1,0 +1,36 @@
+select
+to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM') as month,
+csb.store_id,
+c.name as category,
+sum(op.branch_price* op.quantity_found) sales
+from orders_order o 
+join orders_orderproduct op on o.id = op.order_id 
+join catalog_product p on p.id = op.product_id
+join catalog_storebranch csb on csb.id=o.shopper_store_branch_id and csb.store_id = {{store_id}}
+join catalog_category c on c.id = p.category_id
+where 1=1
+and o.actual_delivery_time >={{desde}} -interval '1 day' 
+and o.actual_delivery_time <{{hasta}} +interval '2 day'
+and o.actual_delivery_time at time zone csb.timezone>={{desde}}
+and o.actual_delivery_time at time zone csb.timezone<{{hasta}} +interval '1 day'  
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+group by 1,2,3
+union 
+select 
+to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM') as month,
+csb.store_id,
+'Custom products' as category,
+sum(ocp.shopper_price* ocp.quantity_found) sales
+from orders_order o 
+join orders_ordercustomproduct ocp on o.id = ocp.order_id and o.currency='MXN'
+join catalog_storebranch csb on o.shopper_store_branch_id = csb.id and csb.store_id = {{store_id}} 
+where 1=1
+and o.actual_delivery_time >={{desde}} -interval '1 day' 
+and o.actual_delivery_time <{{hasta}} +interval '2 day'
+and o.actual_delivery_time at time zone csb.timezone>={{desde}}
+and o.actual_delivery_time at time zone csb.timezone<{{hasta}} +interval '1 day'
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+group by 1,2,3
+order by 4 desc
