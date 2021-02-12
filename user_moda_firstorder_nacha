@@ -7,7 +7,7 @@ st.name as store
 FROM orders_order as o
 JOIN catalog_storebranch as sb on sb.id=o.shopper_store_branch_id
 JOIN catalog_store as st on st.id=sb.store_id 
-WHERE o.currency='PEN' and o.status='DELIVERED' 
+WHERE o.currency='PEN' and o.status='DELIVERED'
 ),
 favorita as (
 SELECT 
@@ -20,8 +20,7 @@ WHERE o.currency='PEN' and o.status='DELIVERED'
 group by 1
 )
 SELECT 
-o.user_id, 
-u.date_first_order,
+o.user_id,
 count(o.id) filter (where o.created<=(u.date_first_order+interval'30 days')) orders_first_30days,
 count(o.id) total_orders_in_cornershop,
 m.tienda_favorita,
@@ -33,6 +32,6 @@ join favorita as m on m.user_id=o.user_id
 join first_supers as fs on fs.user_id=o.user_id and fs.rank=1
 left join first_supers as fs2 on fs2.user_id=o.user_id and fs2.rank=2
 join crm_users_view as u on u.id=o.user_id
-WHERE o.currency='PEN' and o.status='DELIVERED' and u.date_first_order 
-group by 1,2,5,6,7
+WHERE o.currency='PEN' and o.status='DELIVERED'
+group by 1,4,5,6,7
 order by 3 DESC
