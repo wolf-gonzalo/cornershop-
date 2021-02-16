@@ -1,0 +1,108 @@
+select 
+      cs.name store_name
+    , cp.name product_name
+    , case when o_w_markup.store_branch_id = o_w_markup.shopper_store_branch_id then 1 else 0 end same_branch
+    , sum(o_w_markup.markup_cornershop_price) markup_customer_price
+    , op.cornershop_price customer_price
+    --, cpb.branch_price integration_price
+    --, o_w_markup.shopbranch_integration_price
+    , op.shopper_price shopper_price
+    , count(o_w_markup.order_id) orders_w_markups
+    , csb.store_id
+    , op.product_id
+    , cpb.id product_branch_id
+    , o_w_markup.store_branch_id
+    , array_to_string(
+        array_agg(distinct o_w_markup.order_id)
+        , ','
+    ) orders_detail
+    --, coalesce(aux.in_promotion, 'No promo')
+    --, aux.campaignid campaignid
+from catalog_store cs 
+join catalog_storebranch csb on csb.store_id = cs.id
+join orders_order o on o.store_branch_id = csb.id
+join orders_orderproduct op on op.order_id = o.id
+join catalog_product cp on op.product_id = cp.id
+join catalog_productbranch cpb on cpb.product_id = cp.id and csb.id = cpb.branch_id
+join (
+     select
+         op.order_id
+        , op.product_id
+        , cs.id store_id
+        , o.store_branch_id
+        , o.shopper_store_branch_id
+        , cs.name
+        , csb.timezone
+        , cpb.branch_price shopbranch_integration_price
+        , sum(op.quantity_found*(op.cornershop_price-op.shopper_price)) markup_cornershop_price
+    from catalog_store cs
+    join catalog_storebranch csb on csb.store_id = cs.id
+    join orders_order o on o.store_branch_id = csb.id
+    join orders_orderproduct op on op.order_id = o.id
+    join catalog_productbranch cpb on cpb.branch_id = o.shopper_store_branch_id and cpb.product_id = op.product_id
+    left join orders_chargeableitem och_m on o.id = och_m.order_id and och_m.type = 'MARKUP'
+    left join 
+        (
+            SELECT coalesce(sum(discount), 0) AS discount, order_id
+            FROM promotions_ordercampaign oc
+            JOIN orders_order o ON o.id=order_id
+            JOIN catalog_storebranch csb on o.shopper_store_branch_id = csb.id
+            WHERE NOT EXISTS
+               (SELECT 1
+                FROM promotions_freedeliverycampaign fc
+                WHERE campaign_ptr_id = oc.campaign_id
+                  AND NOT o.with_subscription
+                UNION SELECT 1
+                FROM promotions_campaign pc
+                WHERE 
+                    is_store_promotion AND
+                    oc.campaign_id=pc.id
+                ) 
+                      and o.actual_delivery_time between '2021 01 31' and '2021 02 10' -- Filter date (2). Must be un dae before and after filter (1)
+            GROUP BY order_id
+        ) d on o.id = d.order_id
+     where o.actual_delivery_time between '2021 01 31' and '2021 02 10' -- Filter date (2). Must be un dae before and after filter (1)
+    and  o.actual_delivery_time at time zone csb.timezone between '2021 02 01' and '2021 02 09'  
+        and o.status = 'DELIVERED' 
+        and o.order_kind = 'NORMAL' 
+        and cs.country = 'PE'
+        and cs.is_longtail 
+        and cpb.currency = 'PEN'
+        and (case when o.total_receipt is not null then 1 else 0 end) = 1
+      --  and ((o.total - o.delivery_charged - coalesce(och_m.price_charged, 0) + coalesce(d.discount, 0))/(1 + coalesce(csb.markup_pctg, 0)/100)) - 
+        --(coalesce(o.total_receipt, o.shopper_total_receipt)) < -3
+    group by 1,2,3,4,5,6,7,8
+    having (
+        abs(sum(op.quantity_found*(op.cornershop_price-op.shopper_price))) > 0
+        or abs(sum(op.quantity_found*(op.branch_price-op.shopper_price))) > 0 )
+        ) o_w_markup on cp.id = o_w_markup.product_id and csb.id =  o_w_markup.store_branch_id and o.id = o_w_markup.order_id
+left join (
+    select 
+        cpb.id product_branch_id,
+        csb.id branch_id,
+        case when pc.is_store_promotion then 'Store' when not pc.is_store_promotion then 'Brands' else 'No campaign' end as in_promotion, 
+        pc.id campaignid,
+        cpb.product_id product_id
+    from promotions_campaign pc
+    join promotions_productbranchpromotion pbp on pc.id = pbp.campaign_id
+    join catalog_productbranch cpb on pbp.product_branch_id = cpb.id
+    join catalog_storebranch csb on cpb.branch_id = csb.id
+    join catalog_store cs on csb.store_id = cs.id
+    where cs.country = 'PE'
+    and pc.enabled
+    and pc.country = 'PE'
+    and pc.is_store_promotion
+    and pc.valid_until >= now()) aux on aux.product_id = o_w_markup.product_id and aux.branch_id = o_w_markup.store_branch_id
+ where o.actual_delivery_time between '2021 01 31' and '2021 02 10' -- Filter date (2). Must be un dae before and after filter (1)
+    and  o.actual_delivery_time at time zone csb.timezone between '2021 02 01' and '2021 02 09'  
+    and o.status = 'DELIVERED' 
+    and o.order_kind = 'NORMAL' 
+    and cs.country = 'PE'
+    and cs.is_longtail 
+    and cpb.branch_price <> op.shopper_price
+    and coalesce(aux.in_promotion, 'No promo') = 'No promo'
+    --and extract(hour from now() at time zone o_w_markup.timezone) in (18)
+group by 1,2,3,5,6,8,9,10,11
+having abs(sum(op.quantity_found*(op.cornershop_price-op.shopper_price))) > 1
+        --and count(o_w_markup.order_id) >= 2
+order by 4 asc
