@@ -1,0 +1,1 @@
+        date_part ('hour' ,o.actual_delivery_time at time zone 'America/Lima') AS hora,
