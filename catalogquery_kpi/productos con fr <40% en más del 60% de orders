@@ -1,0 +1,73 @@
+select
+    branch_id,
+    branch_name,
+    productbranch_id,
+    product_id,
+    product_name,
+    brand,
+    package,
+    popularity,
+    availability_status,
+    store_id,
+    sum(times_found)::numeric / sum(times_ordered) as fr,
+    sum(times_ordered) as times_ordered,
+    sum(times_found) as times_found,
+    sum(times_not_found) as times_not_found,
+    sum(times_not_found_not_replaced) as times_not_found_not_replaced,
+    sum(sales) as sales,
+    sum(lost_product_sales) as lost_product_sales,
+    sum(lost_product_sales_not_replaced) as lost_product_sales_not_replaced,
+    count(product_id) as days_with_orders,
+    count(product_id) filter (where fr < 0.4) as days_with_breaks,
+    sum(times_replaced_list) as times_replaced_list,
+    sum(times_replaced_custom) as times_replaced_custom,
+    count(product_id) filter (where fr < 0.4)::numeric / count(product_id) as pctg_days_with_breaks
+from (
+    select 
+        csb.id as branch_id,
+        csb.name as branch_name,
+        cpb.id as productbranch_id,
+        cp.id as product_id,
+        cp.name as product_name,
+        cb.name as brand,
+        cp.package,
+        cp.popularity,
+        cpb.availability_status,
+        csb.store_id,
+        to_char(o.actual_delivery_time at time zone csb.timezone, 'YYYY MM DD') as date,
+        count(op.id) as times_ordered,
+        count(op.id) filter (where op.quantity_found > 0) as times_found,
+        count(op.id) filter (where op.quantity_found = 0) as times_not_found,
+        count(op.id) filter (where op.quantity_found = 0) - count(oor.id) as times_not_found_not_replaced,
+        count(op.id) filter (where op.quantity_found > 0)::numeric / count(op.id) as fr,
+        sum(op.quantity) as quantity_ordered,
+        sum(op.quantity_found) as quantity_found,
+        sum(op.quantity_found*op.branch_price) as sales,
+        --case when sum((op.quantity-op.quantity_found)*op.branch_price) < 0 then 0 else sum((op.quantity-op.quantity_found)*op.branch_price) end as sales_lost,
+        sum(case when op.quantity_found = 0 then op.quantity*op.branch_price else 0 end) as lost_product_sales,
+        sum(case when op.quantity_found = 0 and oor.id is null then op.quantity*op.branch_price else 0 end) as lost_product_sales_not_replaced,
+        count(oor.id) filter (where oor.order_product_new_id is not null) as times_replaced_list,
+        count(oor.id) filter (where oor.order_custom_product_new_id is not null) as times_replaced_custom
+    from catalog_storebranch csb 
+    join orders_order o on csb.id = o.shopper_store_branch_id
+    join orders_orderproduct op on o.id = op.order_id 
+    join catalog_product cp on op.product_id = cp.id 
+    join catalog_productbranch cpb on cp.id = cpb.product_id and csb.id = cpb.branch_id
+    left join orders_orderreplacement oor on op.id = oor.order_product_old
+    left join catalog_productcategorization cpc on cp.id = cpc.product_id
+    left join catalog_brand cb on cp.brand_id = cb.id 
+    where 
+        csb.store_id in (841,853,892,842) and 
+        o.actual_delivery_time between '2020 09 16' and '2020 09 25' and 
+        o.actual_delivery_time at time zone csb.timezone between '2020 09 17' and '2020 09 25' and 
+        o.status = 'DELIVERED' and 
+        o.order_kind = 'NORMAL' and 
+        (cpb.availability_status <> 'OUT_OF_STOCK' or cpb.availability_status is null) and 
+        --venta independientemente de su av.
+        cp.is_active and 
+        cpb.active
+        --cpb.availability_status = 'OUT_OF_STOCK'
+        --cpc.category_id not in (134,135,136,137)
+    group by 1,2,3,4,5,6,7,8,9,10,11) h
+group by 1,2,3,4,5,6,7,8,9,10
+having count(product_id) filter (where fr < 0.4)::numeric / count(product_id) > 0.6 and count(product_id) > 1 and sum(times_found)::numeric / sum(times_ordered) < 0.4;
