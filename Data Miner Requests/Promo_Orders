@@ -1,0 +1,50 @@
+select
+to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM') as month,
+csb.store_id,
+c.name as category,
+count(distinct o.id) as orders,
+sum(op.branch_price* op.quantity_found) sales,
+sum(op.quantity_found) as found,
+sum(op.quantity) as requested,
+t1.orders_with_promotions,
+t1.campaigns
+from orders_order o 
+join orders_orderproduct op on o.id = op.order_id 
+join catalog_product p on p.id=op.product_id
+join catalog_storebranch csb on csb.id=o.shopper_store_branch_id 
+join catalog_category c on c.id = p.category_id
+    left join (
+    select 
+    to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM') as month,
+    csb.store_id,
+    c.id as category_id,
+    count(distinct oc.order_id) as orders_with_promotions,
+    coalesce(string_agg(distinct oc.campaign_id::text,','),'NA') as campaigns
+    from orders_order o 
+        join orders_orderproduct op on o.id = op.order_id 
+        join catalog_product p on p.id=op.product_id
+        join catalog_storebranch csb on csb.id=o.shopper_store_branch_id 
+        join catalog_category c on c.id = p.category_id
+        join catalog_productbranch pb on pb.product_id=p.id and pb.branch_id=csb.id
+            left join promotions_productbranchpromotion pbp on pbp.product_branch_id=pb.id
+            left join promotions_ordercampaign oc on oc.order_id=o.id and oc.campaign_id=pbp.campaign_id and oc.discount>0
+        where 1=1
+        and csb.store_id = {{store_id}}
+        and o.actual_delivery_time >={{desde}} -interval '1 day' 
+        and o.actual_delivery_time <{{hasta}} +interval '2 day'
+        and o.actual_delivery_time at time zone csb.timezone>={{desde}}
+        and o.actual_delivery_time at time zone csb.timezone<{{hasta}} +interval '1 day'  
+        and o.status='DELIVERED'
+        and o.order_kind='NORMAL'
+        group by 1,2,3
+    ) as t1 on t1.category_id=c.id and t1.store_id=csb.store_id and t1.month=to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM')
+where 1=1
+and csb.store_id = {{store_id}}
+and o.actual_delivery_time >={{desde}} -interval '1 day' 
+and o.actual_delivery_time <{{hasta}} +interval '2 day'
+and o.actual_delivery_time at time zone csb.timezone>={{desde}}
+and o.actual_delivery_time at time zone csb.timezone<{{hasta}} +interval '1 day'  
+and o.status='DELIVERED'
+and o.order_kind='NORMAL'
+group by 1,2,3,8,9
+order by 1,4 desc
