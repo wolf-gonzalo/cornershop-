@@ -1,0 +1,29 @@
+select 
+(o.created at time zone sb.timezone)::date as created,
+s.country,
+sc.name as category_es,
+scl.name as category_en,
+s.id as store_id,
+s.name as store,
+o.id as order_id,
+o.status,
+ceo.operation_type,
+ceo.detail as reason
+from orders_order o
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+join catalog_store s on s.id=sb.store_id
+left join catalog_storecollectionitem sci on sci.store_id=s.id
+left join catalog_storecollection sc on sc.id=sci.collection_id
+left join catalog_storecollectionlocalization scl on scl.collection_id=sc.id and scl.language='en-us'
+join common_eventoperation ceo on 1=1
+    and ceo.reference_content_type_id = 25 
+    and ceo.reference_id = o.id 
+    and ceo.operation_type = 'CANCEL_ORDER' 
+    and ceo.detail='CLIENT_ASKED_NO_STOCK'
+where    
+o.status in ('REJECTED_BY_SYSTEM', 'REJECTED_BY_CM','REJECTED','CANCELED_BY_CM','CANCELED')
+and s.country='PE'
+and o.created>={{desde}} -interval '1 day'
+and o.created<{{hasta}} +interval '2 day'
+and o.created at time zone sb.timezone>={{desde}}
+and o.created at time zone sb.timezone<{{hasta}} +interval '1 day'
