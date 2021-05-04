@@ -1,0 +1,26 @@
+select 
+s.country,
+s.id as store_id,
+s.name as store,
+sb.id as branch_id,
+sb.name as branch,
+to_char(o.actual_delivery_time,'YYYY-MM-DD') as delivery_date,
+o.id as order_id,
+(o.qty_products_ordered) as products_ordered,
+(o.qty_products_found) as products_found,
+(o.qty_products_found+o.qty_products_replaced) as products_delivered,
+p.id as product_id,
+p.name as product_name,
+(op.branch_price*op.quantity_found) as sales,
+op.quantity_found as qty_found
+from orders_order o
+join orders_orderproduct op on op.order_id=o.id
+join catalog_product p on p.id=op.product_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+join catalog_store s on sb.store_id=s.id and s.id=1278
+where 1=1
+and op.updated>='2020-11-01'::date-interval '1 day'
+and op.updated<'2021-02-24'::date+ interval '2 days'
+and op.updated at time zone sb.timezone>='2020-11-01'
+and op.updated at time zone sb.timezone<'2021-02-24'
+and o.status='DELIVERED' and o.order_kind='NORMAL'
