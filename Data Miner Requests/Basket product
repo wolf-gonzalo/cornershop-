@@ -1,0 +1,34 @@
+with target_orders as (
+select
+o.id as order_id,
+c.name as category
+from orders_orderproduct as op 
+join catalog_product as p on p.id=op.product_id and p.currency={{currency}}
+join catalog_category as c on c.id=p.category_id and c.id = {{category_id}}
+join orders_order as o on o.id=op.order_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id [[and sb.store_id in ({{store_ids}})]]
+--join catalog_store s on s.id=sb.store_id and s.is_longtail=false 
+where 1=1
+and o.actual_delivery_time>={{desde}}- interval '1 day'
+and o.actual_delivery_time<{{hasta}} + interval '1 day'
+and o.actual_delivery_time at time zone sb.timezone>={{desde}}
+and o.actual_delivery_time at time zone sb.timezone<{{hasta}}
+and o.order_kind='NORMAL'
+and o.status='DELIVERED'
+GROUP BY 1,2)
+select
+tao.category as market_basket_category,
+p.id as product_id,
+p.name as product_name,
+c.name as category,
+coalesce(b.name,concat('Generic from: ',c.name)) as brand,
+count(distinct o.id) as orders
+from target_orders tao 
+join orders_orderproduct as op on op.order_id=tao.order_id
+join catalog_product as p on p.id=op.product_id
+left join catalog_brand b on b.id=p.brand_id
+join catalog_category as c on c.id=p.category_id
+join orders_order as o on o.id=op.order_id
+join catalog_storebranch sb on sb.id=o.shopper_store_branch_id
+group by 1,2,3,4,5
+order by 6 desc
