@@ -1,0 +1,41 @@
+select i.product_id
+    ,i.product_name
+    ,i.category_name
+    ,sum(i.quantity_found) total_purchased
+    ,count(distinct i.order_id) qty_orders
+    ,sum(i.total_markup_cornershop_price) total_markup
+from (select
+        cs.id store_id
+        ,op.order_id
+        ,op.product_id
+        ,cpb.id productbranch_id
+        ,cp.name product_name
+        ,ccl.name as category_name
+        ,sum(op.quantity_found*coalesce(op.shopper_price,0)) total_shopper_price
+        ,sum(op.quantity_found) quantity_found
+        ,sum(op.quantity_found*(coalesce(op.cornershop_price,0)-coalesce(op.shopper_price,0))) total_markup_cornershop_price
+        ,sum(op.quantity_found*(coalesce(op.cornershop_price,0)-coalesce(op.shopper_price,0)))/nullif(sum(op.quantity_found*coalesce(op.shopper_price,0)),0) as markup_pctg
+        , case when sum(op.quantity_found*(coalesce(op.cornershop_price,0)-coalesce(op.shopper_price,0))) > 1  then 'Markup'
+        when sum(op.quantity_found*(coalesce(op.cornershop_price,0)-coalesce(op.shopper_price,0))) < -1 then 'Markdown'
+        else 'No markup' end as kind
+        from catalog_storebranch csb
+        join catalog_store cs on csb.store_id = cs.id
+        join orders_order o on csb.id = o.shopper_store_branch_id
+        join orders_orderproduct op on o.id = op.order_id
+        join catalog_productbranch cpb on cpb.product_id = op.product_id and cpb.branch_id = o.store_branch_id
+        join catalog_product cp on cp.id = cpb.product_id
+        join catalog_productcategorization cpc on cpb.product_id = cpc.product_id
+        join catalog_category cc on cpc.category_id = cc.id
+        join catalog_categorylocalization ccl on cc.id = ccl.category_id and ccl.language = 'en-us'
+        where o.status = 'DELIVERED'
+        and o.order_kind = 'NORMAL'
+        and csb.store_id =  {{store_id}}
+        and cp.currency = {{currency}}
+        and o.actual_delivery_time between {{start_date}} - interval '2 day' and {{end_date}} + interval '2 day' -- Filter date (2). Must be un dae before and after filter (1)
+        and (o.actual_delivery_time at time zone csb.timezone)::date between {{start_date}} and {{end_date}}
+        group by 1,2,3,4,5,6
+       -- having sum(op.quantity_found*(coalesce(op.cornershop_price,0)-coalesce(op.shopper_price,0)))<0
+       )i
+group by 1,2,3
+order by sum(i.total_markup_cornershop_price) asc
+limit 100
