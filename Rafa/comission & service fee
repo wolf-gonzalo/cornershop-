@@ -1,0 +1,22 @@
+Select
+to_char(o.actual_delivery_time at time zone csb.timezone,'YYYY-MM') as month_order
+,cs.id
+,cs.name
+,case when cs.is_longtail = 'false' AND COALESCE(csc.commission, o.commission, 0) > 0 then 'Full Service - Partner'
+       when cs.is_longtail = 'true'  then 'Self Service'
+       when cs.is_longtail = 'false' AND COALESCE(csc.commission, o.commission, 0) = 0 then 'Full Service - Non Partner' end as Store_status
+,AVG(o.total-o.delivery_charged) as "Avg. Ticket"
+, COUNT(distinct o.id) as Num_orders
+,csb.outer_markup_pctg as Service_fee
+,AVG(o.commission*total_receipt)/AVG(total_receipt) as "Partner Commission"
+From orders_order as o
+LEFT JOIN catalog_storebranch as csb on csb.id = o.store_branch_id
+LEFT JOIN catalog_store as cs on cs.id = csb.store_id
+LEFT JOIN catalog_storecommission as csc on csc.store_id = cs.id And ({{today}}<csc.valid_to OR ({{today}}>csc.valid_from AND csc.valid_to is NULL))
+LEFT JOIN  (SELECT SUM(oci.price_charged) as markup, order_id FROM orders_chargeableitem oci WHERE oci.type = 'MARKUP' group by 2) as m on o.id = m.order_id
+WHERE o.delivery_status = 'DELIVERED'
+AND order_kind = 'NORMAL'
+And o.currency = {{currency}}
+AND o.actual_delivery_time at time zone csb.timezone between {{start_date}} and {{end_date}}
+GROUP BY 1,2,3,4,csb.outer_markup_pctg
+Order BY Num_orders desc
