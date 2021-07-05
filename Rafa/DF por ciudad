@@ -1,0 +1,6 @@
+select gc.id, gc.name, dp.id, dp.with_subscription, dp.label, dp.type, dp.price, dp.from_distance, dp.from_amount, dp.weekday, dp.from_time, dp.to_time, dp.valid_from, dp.valid_to, dp.created_at, dp.updated_at, dp.area_id, dp.operator_id, dp.store_id, dp.store_branch_id, dp.zone_id, dp.on_demand, dp.audience, dp.excluded_stores_ids
+from delivery_slots_deliverypricecomponent dp
+join geo_city as gc ON gc.id = dp.city_id
+where dp.city_id = {{city_id}}
+and dp.valid_to IS NULL
+and dp.with_subscription = 'false'
