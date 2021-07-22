@@ -1,16 +1,15 @@
 select  
 pp.id as project_id,
-pd.id as promotionaldepartment_id,
-pd.name as promotionaldepartment_name,
+c.id as campaign_id,
+c.name as campaign_name,
 p.id as product_id,
 p.name as product_name,
 p.barcodes
-    from promotions_promotionaldepartmentproductbranch pdpb
-        join promotions_promotionalprojectcomponent ppc on ppc.component_id=pdpb.department_id and ppc.component_content_type_id in (243)
-        join promotions_promotionalproject pp on pp.id = ppc.promotional_project_id 
-        join promotions_promotionaldepartment pd on pd.id=ppc.component_id
-        join promotions_productbranchpromotion pbp on pbp.product_branch_id=pdpb.branch_product_id
+    from promotions_campaign c 
+        join promotions_promotionalprojectcomponent ppc on ppc.component_id=c.id and ppc.component_content_type_id in (565,240, 241, 245, 310, 351, 397, 398, 447, 448)
+        join promotions_promotionalproject pp on pp.id = ppc.promotional_project_id and pp.id={{project_id}}
+        join promotions_productbranchpromotion pbp on pbp.campaign_id=c.id
         join catalog_productbranch pb ON  pb.id=pbp.product_branch_id 
-        join catalog_product p on p.id=pb.product_id 
-    where pp.id = 13415
+        join catalog_product p on p.id=pb.product_id and p.currency='PEN'
+    where 1=1
     group by 1,2,3,4,5,6
